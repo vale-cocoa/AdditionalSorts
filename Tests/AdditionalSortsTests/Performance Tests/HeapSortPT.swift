@@ -1,8 +1,8 @@
 //
-//  TestsHelpers.swift
+//  HeapSortPT.swift
 //  AdditionalSortsTests
 //
-//  Created by Valeriano Della Longa on 2021/03/17.
+//  Created by Valeriano Della Longa on 2021/03/23.
 //  Copyright © 2021 Valeriano Della Longa
 //
 //  Permission is hereby granted, free of charge, to any person
@@ -29,41 +29,19 @@
 import XCTest
 @testable import AdditionalSorts
 
-// MARK: - Useful constants and vars
-let sortedElements = 1...500
-
-var shuffledElements: Array<Int> { sortedElements.shuffled() }
-
-let performanceSortedElements = 1...10_000
-
-var shuffledPerfomanceElements: Array<Int> { performanceSortedElements.shuffled() }
-
-let err = NSError(domain: "com.vdl.additionalSorts", code: 1, userInfo: nil)
-
-let alwaysThrowingPredicate: (Int, Int) throws -> Bool = { _, _ in throw err }
-
-// MARK: - 
-// A MutableCollection NOT implementing
-// withContiguousMutableStorageIfAvailble(_:) method
-struct Coll<Element>: MutableCollection {
-    var elements: [Element]
-    
-    var count: Int { elements.count }
-    
-    var isEmpty: Bool { elements.isEmpty }
-    
-    var startIndex: Int { 0 }
-    
-    var endIndex: Int { count }
-    
-    func index(after i: Int) -> Int { i + 1 }
-    
-    subscript(position: Int) -> Element {
-        get {
-            elements[position]
+final class HeapSortPT: XCTestCase {
+    func testHeapSort_Perfomance_whenIsNotSortedArray() {
+        var sut = shuffledPerfomanceElements
+        measure {
+            sut.heapSort(by: <)
         }
-        mutating set {
-            elements[position] = newValue
+        
+    }
+    
+    func testHeapSort_Performance_whenIsSortedArray() {
+        var sut = Array(performanceSortedElements)
+        measure {
+            sut.heapSort(by: <)
         }
     }
     
