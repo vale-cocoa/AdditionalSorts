@@ -1,3 +1,3 @@
 # AdditionalSorts
 
-A description of this package.
+Some popular sorting algorithms implementations in Swift over MutableCollection.
