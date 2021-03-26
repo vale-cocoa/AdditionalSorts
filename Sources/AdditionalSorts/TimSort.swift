@@ -26,7 +26,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 //  OTHER DEALINGS IN THE SOFTWARE.
 
-extension MutableCollection {
+extension MutableCollection where Self: RandomAccessCollection {
     public mutating func timSort(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
         guard !isEmpty else { return }
         
@@ -60,7 +60,7 @@ extension MutableCollection {
             }
             if end < endIndex && distance(from: start, to: end) < minimumRunLenght {
                 let newEnd = Swift.min(endIndex, index(start, offsetBy: minimumRunLenght))
-                try insertionSortWithBinarySearchOn(start..<newEnd, by: areInIncreasingOrder)
+                try insertionSorterWithBinarySearch(start..<newEnd, by: areInIncreasingOrder)
                 end = newEnd
             }
             runs.append(start..<end)
@@ -131,6 +131,51 @@ extension MutableCollection {
             j += 1
             formIndex(after: &k)
         }
+    }
+    
+}
+
+// MARK: - TimSort utilites
+extension MutableCollection where Self: RandomAccessCollection {
+    @usableFromInline
+    mutating func reverseWithin(_ range: Range<Index>) {
+        var i = range.lowerBound
+        var j = range.upperBound
+        while i < j {
+            formIndex(before: &j)
+            swapAt(i, j)
+            formIndex(after: &i)
+        }
+    }
+    
+    @inline(__always)
+    func minimumRunLenght(_ c: Int) -> Int {
+        let bitToUse = 6
+        if c < 1 << bitToUse { return c }
+        let offset = (Int.bitWidth - bitToUse) - c.leadingZeroBitCount
+        let mask = (1 << offset) - 1
+        
+        return c >> offset + (c & mask == 0 ? 0 : 1)
+    }
+    
+    @inline(__always)
+    func findNextRun(from start: Index, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> (end: Index, isDecreasing: Bool) {
+        var prev = start
+        var curr = index(after: start)
+        guard curr < endIndex else { return (curr, false) }
+        
+        let isDecreasing = try areInIncreasingOrder(self[curr], self[prev])
+        repeat {
+            prev = curr
+            formIndex(after: &curr)
+        } while try curr < endIndex && isDecreasing == areInIncreasingOrder(self[curr], self[prev])
+        
+        return (curr, isDecreasing)
+    }
+    
+    @inline(__always)
+    func runCount(_ run: Range<Index>) -> Int {
+        distance(from: run.lowerBound, to: run.upperBound)
     }
     
 }

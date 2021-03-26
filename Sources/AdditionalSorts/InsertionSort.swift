@@ -26,7 +26,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 //  OTHER DEALINGS IN THE SOFTWARE.
 
-extension MutableCollection {
+extension MutableCollection where Self: RandomAccessCollection {
     public mutating func insertionSort(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
         guard !isEmpty else { return }
         
@@ -36,12 +36,12 @@ extension MutableCollection {
                 buff.baseAddress != nil && buffCount > 0
             else { return true }
             
-            try buff.insertionSortOn(0..<buffCount, by: areInIncreasingOrder)
+            try buff.insertionSorter(0..<buffCount, by: areInIncreasingOrder)
             
             return true
         }) ?? false
         if !done  {
-            try insertionSortOn(startIndex..<endIndex, by: areInIncreasingOrder)
+            try insertionSorter(startIndex..<endIndex, by: areInIncreasingOrder)
         }
     }
     
@@ -49,7 +49,7 @@ extension MutableCollection {
         guard !isEmpty else { return }
         
         let done: Bool = try withContiguousMutableStorageIfAvailable { buffer in
-            try buffer.insertionSortWithBinarySearchOn(buffer.startIndex..<buffer.endIndex, by: areInIncreasingOrder)
+            try buffer.insertionSorterWithBinarySearch(buffer.startIndex..<buffer.endIndex, by: areInIncreasingOrder)
             
             return true
         } ?? false
@@ -57,24 +57,22 @@ extension MutableCollection {
         guard
             done
         else {
-            try insertionSortWithBinarySearchOn(startIndex..<endIndex, by: areInIncreasingOrder)
+            try insertionSorterWithBinarySearch(startIndex..<endIndex, by: areInIncreasingOrder)
             
             return
         }
     }
     
     @inlinable
-    mutating func insertionSortOn(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        let hiOffset = distance(from: range.lowerBound, to: range.upperBound) - 1
-        let hi = index(range.lowerBound, offsetBy: hiOffset)
+    mutating func insertionSorter(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
+        let hi = index(before: range.upperBound)
         guard range.lowerBound < hi else { return }
             
         var i = index(after: range.lowerBound)
         while i < range.upperBound {
             var j = i
             INNER: while j > range.lowerBound {
-                let offsetToPreviousIndex = distance(from: startIndex, to: j) - 1
-                let prev = index(startIndex, offsetBy: offsetToPreviousIndex)
+                let prev = index(before: j)
                 guard prev >= range.lowerBound else { break }
                 
                 if try areInIncreasingOrder(self[j], self[prev]) {
@@ -90,7 +88,7 @@ extension MutableCollection {
     }
     
     @usableFromInline
-    mutating func insertionSortWithBinarySearchOn(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
+    mutating func insertionSorterWithBinarySearch(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
         var idx = index(after: range.lowerBound)
         while idx < range.upperBound {
             let element = self[idx]
@@ -103,48 +101,46 @@ extension MutableCollection {
     
 }
 
-// MARK: - Insertion sort on UnsafeMutableBufferPointer
-extension UnsafeMutableBufferPointer {
-    @inlinable
-    mutating func insertionSortOn(_ range: Range<Int>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        let hi = range.upperBound - 1
-        guard range.lowerBound < hi else { return }
-            
-        var i = range.lowerBound + 1
-        while i < hi + 1 {
-            var j = i
-            INNER: while j > range.lowerBound {
-                let prev = j - 1
-                guard prev >= range.lowerBound else { break }
-                
-                if try areInIncreasingOrder(self[j], self[prev]) {
-                    swapAt(j, prev)
-                } else {
-                    break INNER
-                }
-                j = prev
-            }
-            i += 1
+// MARK: - InsertionSortWithBinarySearch utilties
+extension MutableCollection where Self: RandomAccessCollection {
+    @usableFromInline
+    mutating func shiftElements(start: Index, limit: Index) {
+        var idx = index(before: limit)
+        var prev = index(before: idx)
+        while prev >= start {
+            self[idx] = self[prev]
+            idx = prev
+            formIndex(before: &prev)
         }
     }
     
-    @usableFromInline
-    mutating func insertionSortWithBinarySearchOn(_ range: Range<Int>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        var idx = range.lowerBound + 1
-        while idx < range.upperBound {
-            let element = self.baseAddress!.advanced(by: idx).move()
-            let pos = try binarySearchInsertionIdx(of: element, in: range.lowerBound..<idx, sortedBy: areInIncreasingOrder)
-            let countOfShifted = idx - pos
-            if countOfShifted > 0 {
-                let tmp = UnsafeMutablePointer<Element>.allocate(capacity: countOfShifted)
-                tmp.moveInitialize(from: self.baseAddress!.advanced(by: pos), count: countOfShifted)
-                self.baseAddress!.advanced(by: pos + 1).moveInitialize(from: tmp, count: countOfShifted)
-                tmp.deallocate()
+    func binarySearchInsertionIdx(of element: Element, in range: Range<Index>, sortedBy areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
+        guard
+            range.lowerBound != range.upperBound
+        else { return range.lowerBound }
+        
+        let lastIdx = index(before: range.upperBound)
+        if range.lowerBound == lastIdx {
+            if try areInIncreasingOrder(element, self[range.lowerBound]) {
+                
+                return range.lowerBound
+            } else {
+                
+                return index(after: range.lowerBound)
             }
-            self.baseAddress!.advanced(by: pos).initialize(to: element)
-            
-            idx += 1
         }
+        let midOffset = distance(from: range.lowerBound, to: range.upperBound) / 2
+        let mid = index(range.lowerBound, offsetBy: midOffset)
+        if try areInIncreasingOrder(self[mid], element) {
+            
+            return try binarySearchInsertionIdx(of: element, in: index(after: mid)..<range.upperBound, sortedBy: areInIncreasingOrder)
+        } else if try areInIncreasingOrder(element, self[mid]) {
+            
+            return try binarySearchInsertionIdx(of: element, in: range.lowerBound..<mid, sortedBy: areInIncreasingOrder)
+        }
+        
+        return mid
     }
     
 }
+

@@ -26,26 +26,18 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 //  OTHER DEALINGS IN THE SOFTWARE.
 
-extension MutableCollection {
+extension MutableCollection where Self: RandomAccessCollection {
     public mutating func dutchFlagQuickSort(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
         guard !isEmpty else { return }
         
         let done: Bool = try withContiguousMutableStorageIfAvailable { buffer in
-            let bufferCount = buffer.count
-            guard
-                buffer.baseAddress != nil,
-                bufferCount > 0
-            else { return true }
-            
-            try buffer.dutchFlagQSorter(lo: 0, hi: bufferCount - 1, by: areInIncreasingOrder)
+            try buffer.dutchFlagQSorter(0..<buffer.count, by: areInIncreasingOrder)
             
             return true
         } ?? false
         
         guard done else {
-            let lastOffset = distance(from: startIndex, to: endIndex) - 1
-            let lastElementIdx = index(startIndex, offsetBy: lastOffset)
-            try dutchFlagQSorter(lo: startIndex, hi: lastElementIdx, by: areInIncreasingOrder)
+            try dutchFlagQSorter(startIndex..<endIndex, by: areInIncreasingOrder)
             
             return
         }
@@ -55,15 +47,13 @@ extension MutableCollection {
         guard !isEmpty else { return }
         
         let done: Bool = try withContiguousMutableStorageIfAvailable { buffer in
-            try buffer.hoareQSorter(lo: buffer.startIndex, hi: buffer.index(before: buffer.endIndex), by: areInIncreasingOrder)
+            try buffer.hoareQSorter(0..<buffer.count, by: areInIncreasingOrder)
             
             return true
         } ?? false
         
         guard done else {
-            let lastOffset = distance(from: startIndex, to: endIndex) - 1
-            let lastIdx = index(startIndex, offsetBy: lastOffset)
-            try hoareQSorter(lo: startIndex, hi: lastIdx, by: areInIncreasingOrder)
+            try hoareQSorter(startIndex..<endIndex, by: areInIncreasingOrder)
             
             return
         }
@@ -73,21 +63,13 @@ extension MutableCollection {
         guard !isEmpty else { return }
         
         let done: Bool = try withContiguousMutableStorageIfAvailable { buffer in
-            let bufferCount = buffer.count
-            guard
-                buffer.baseAddress != nil,
-                bufferCount > 0
-            else { return true }
-            
-            try buffer.lomutuQSorter(lo: 0, hi: (bufferCount - 1), by: areInIncreasingOrder)
+            try buffer.lomutuQSorter(0..<buffer.count, by: areInIncreasingOrder)
             
             return true
         } ?? false
         
         guard done else {
-            let lastOffset = distance(from: startIndex, to: endIndex) - 1
-            let lastIdx = index(startIndex, offsetBy: lastOffset)
-            try lomutuQSorter(lo: startIndex, hi: lastIdx, by: areInIncreasingOrder)
+            try lomutuQSorter(startIndex..<endIndex, by: areInIncreasingOrder)
             
             return
         }
@@ -97,43 +79,36 @@ extension MutableCollection {
         guard !isEmpty else { return }
         
         let done: Bool = try withContiguousMutableStorageIfAvailable { buffer in
-            let bufferCount = buffer.count
-            guard
-                buffer.baseAddress != nil,
-                bufferCount > 0
-            else { return true }
-            
-            try buffer.dualPivotQSorter(lo: 0, hi: (bufferCount - 1) , by: areInIncreasingOrder)
+            try buffer.dualPivotQSorter(0..<buffer.count, by: areInIncreasingOrder)
             
             return true
         } ?? false
         
         guard done else {
-            let lastOffset = distance(from: startIndex, to: endIndex) - 1
-            let lastIdx = index(startIndex, offsetBy: lastOffset)
-            try dualPivotQSorter(lo: startIndex, hi: lastIdx, by: areInIncreasingOrder)
+            try dualPivotQSorter(startIndex..<endIndex, by: areInIncreasingOrder)
             
             return
         }
     }
     
     // DutchFlag
-    mutating func dutchFlagQSorter(lo: Index, hi: Index, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        guard lo < hi  else { return }
+    mutating func dutchFlagQSorter(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
+        let hi = index(before: range.upperBound)
+        guard range.lowerBound < hi  else { return }
         
-        let lenght = distance(from: lo, to: hi) + 1
+        let lenght = distance(from: range.lowerBound, to: range.upperBound)
         guard lenght > 10 else {
-            try insertionSortOn(lo..<(index(after: hi)), by: areInIncreasingOrder)
+            try insertionSorter(range, by: areInIncreasingOrder)
             
             return
         }
-        let p = try pivot(within: lo..<index(after: hi), by: areInIncreasingOrder)
-        swapAt(lo, p)
+        let p = try pivot(range, by: areInIncreasingOrder)
+        swapAt(range.lowerBound, p)
  
-        var lt = lo
+        var lt = range.lowerBound
         var gt = hi
-        var i = lo
-        let v = self[lo]
+        var i = range.lowerBound
+        let v = self[range.lowerBound]
         while i <= gt {
             if try areInIncreasingOrder(self[i], v) {
                 swapAt(lt, i)
@@ -141,46 +116,39 @@ extension MutableCollection {
                 formIndex(after: &i)
             } else if try areInIncreasingOrder(v, self[i]) {
                 swapAt(i, gt)
-                let prevOffset = distance(from: startIndex, to: gt) - 1
-                guard prevOffset >= 0 else { break }
-                
-                gt = index(startIndex, offsetBy: prevOffset)
+                formIndex(before: &gt)
             } else {
                 formIndex(after: &i)
             }
         }
-        let prevLtOffset = distance(from: startIndex, to: lt) - 1
-        if prevLtOffset >= 0 {
-            let prevLt = index(startIndex, offsetBy: prevLtOffset)
-            try dutchFlagQSorter(lo: lo, hi: prevLt, by: areInIncreasingOrder)
-        }
-        try dutchFlagQSorter(lo: index(after: gt), hi: hi, by: areInIncreasingOrder)
+        try dutchFlagQSorter(range.lowerBound..<lt, by: areInIncreasingOrder)
+        try dutchFlagQSorter(index(after: gt)..<range.upperBound, by: areInIncreasingOrder)
     }
     
     // Hoare
-    mutating func hoareQSorter(lo: Index, hi: Index, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        guard lo < hi else { return }
+    mutating func hoareQSorter(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
+        let hi = index(before: range.upperBound)
+        guard range.lowerBound < hi else { return }
         
-        let lenght = distance(from: lo, to: hi) + 1
+        let lenght = distance(from: range.lowerBound, to: range.upperBound)
         guard lenght > 10 else {
-            try insertionSortWithBinarySearchOn(lo..<(index(after: hi)), by: areInIncreasingOrder)
+            try insertionSorterWithBinarySearch(range, by: areInIncreasingOrder)
             
             return
         }
         
-        let p = try pivot(within: lo..<index(after: hi), by: areInIncreasingOrder)
-        swapAt(lo, p)
-        let pivot = try hoarePartition(lo: lo, hi: hi, by: areInIncreasingOrder)
-        let prevPivotOffset = distance(from: lo, to: pivot)
-        let prevPivot = index(lo, offsetBy: prevPivotOffset)
-        try hoareQSorter(lo: lo, hi: prevPivot, by: areInIncreasingOrder)
-        try hoareQSorter(lo: index(after: pivot), hi: hi, by: areInIncreasingOrder)
+        let p = try pivot(range, by: areInIncreasingOrder)
+        swapAt(range.lowerBound, p)
+        let pivot = try hoarePartition(range, by: areInIncreasingOrder)
+        try hoareQSorter(range.lowerBound..<pivot, by: areInIncreasingOrder)
+        try hoareQSorter(index(after: pivot)..<range.upperBound, by: areInIncreasingOrder)
     }
     
-    mutating func hoarePartition(lo: Index, hi: Index, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
-        let pivot = self[lo]
-        var i = lo
-        var j = index(after: hi)
+    mutating func hoarePartition(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
+        let hi = index(before: range.upperBound)
+        let pivot = self[range.lowerBound]
+        var i = range.lowerBound
+        var j = range.upperBound
         while true {
             repeat {
                 if i == hi { break }
@@ -188,43 +156,42 @@ extension MutableCollection {
             } while try areInIncreasingOrder(self[i], pivot)
             
             repeat {
-                if j == lo { break }
-                let prevJOffset = distance(from: lo, to: j) - 1
-                j = index(lo, offsetBy: prevJOffset)
+                if j == range.lowerBound { break }
+                formIndex(before: &j)
             } while try areInIncreasingOrder(pivot, self[j])
             if i >= j { break }
             swapAt(i, j)
         }
-        swapAt(lo, j)
+        swapAt(range.lowerBound, j)
         
         return j
     }
     
     // Lomutu
-    mutating func lomutuQSorter(lo: Index, hi: Index, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        guard lo < hi else { return }
+    mutating func lomutuQSorter(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
+        let hi = index(before: range.upperBound)
+        guard range.lowerBound < hi else { return }
         
-        let lenght = distance(from: lo, to: hi) + 1
+        let lenght = distance(from: range.lowerBound, to: range.upperBound)
         guard lenght > 10 else {
-            try insertionSortWithBinarySearchOn(lo..<(index(after: hi)), by: areInIncreasingOrder)
+            try insertionSorterWithBinarySearch(range, by: areInIncreasingOrder)
             
             return
         }
         
-        var p = try pivot(within: lo..<index(after: hi), by: areInIncreasingOrder)
+        var p = try pivot(range, by: areInIncreasingOrder)
         swapAt(hi, p)
-        p = try lomutuPartition(lo: lo, hi: hi, by: areInIncreasingOrder)
-        let prevPOffset = distance(from: startIndex, to: p) - 1
-        let prevP = index(startIndex, offsetBy: prevPOffset)
-        try lomutuQSorter(lo: lo, hi: prevP, by: areInIncreasingOrder)
-        try lomutuQSorter(lo: index(after: p), hi: hi, by: areInIncreasingOrder)
+        p = try lomutuPartition(range, by: areInIncreasingOrder)
+        try lomutuQSorter(range.lowerBound..<p, by: areInIncreasingOrder)
+        try lomutuQSorter(index(after: p)..<range.upperBound, by: areInIncreasingOrder)
     }
     
-    mutating func lomutuPartition(lo: Index, hi: Index, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
+    mutating func lomutuPartition(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
+        let hi = index(before: range.upperBound)
         let pivot = self[hi]
         
-        var i = lo
-        var j = lo
+        var i = range.lowerBound
+        var j = range.lowerBound
         while j < hi {
             if try areInIncreasingOrder(pivot, self[j]) == false {
                 swapAt(i, j)
@@ -238,51 +205,47 @@ extension MutableCollection {
     }
     
     // DualPivot
-    mutating func dualPivotQSorter(lo: Index, hi: Index, by  areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        guard lo < hi else { return }
+    mutating func dualPivotQSorter(_ range: Range<Index>, by  areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
+        let hi = index(before: range.upperBound)
+        guard range.lowerBound < hi else { return }
         
-        let lenght = distance(from: lo, to: hi)
+        let lenght = distance(from: range.lowerBound, to: hi)
         guard
             lenght > 46
         else {
-            try insertionSortWithBinarySearchOn(lo..<(index(after: hi)), by: areInIncreasingOrder)
+            try insertionSorterWithBinarySearch(range, by: areInIncreasingOrder)
             
             return
         }
         let offset = lenght / 3
-        var mid1 = index(lo, offsetBy: offset)
-        var mid2 = index(lo, offsetBy: (lenght - offset))
-        let mid = index(lo, offsetBy: lenght / 2)
+        var mid1 = index(range.lowerBound, offsetBy: offset)
+        var mid2 = index(hi, offsetBy: -offset)
+        let mid = index(range.lowerBound, offsetBy: lenght / 2)
+        let afterMid = index(after: mid)
         if lenght <= 150 {
-            mid1 = try medianOf(lo: lo, hi: mid, by: areInIncreasingOrder)
-            mid2 = try medianOf(lo: index(after: mid), hi: hi, by: areInIncreasingOrder)
+            mid1 = try medianOf(range.lowerBound..<afterMid, by: areInIncreasingOrder)
+            mid2 = try medianOf(afterMid..<range.upperBound, by: areInIncreasingOrder)
         } else {
-            mid1 = try ninther(lo: lo, hi: mid, by: areInIncreasingOrder)
-            mid2 = try ninther(lo: index(after: mid), hi: hi, by: areInIncreasingOrder)
+            mid1 = try ninther(range.lowerBound..<afterMid, by: areInIncreasingOrder)
+            mid2 = try ninther(afterMid..<range.upperBound, by: areInIncreasingOrder)
         }
-        swapAt(lo, mid1)
+        swapAt(range.lowerBound, mid1)
         swapAt(hi, mid2)
-        
-        let pivots = try dualPivotPartition(lo: lo, hi: hi, by: areInIncreasingOrder)
-        
-        let beforeLPOffset = distance(from: startIndex, to: pivots.lPivot) - 1
-        let beforeLP = index(startIndex, offsetBy: beforeLPOffset)
-        try dualPivotQSorter(lo: lo, hi: beforeLP, by: areInIncreasingOrder)
-        let beforeRPOffset = distance(from: startIndex, to: pivots.rPivot) - 1
-        let beforeRP = index(startIndex, offsetBy: beforeRPOffset)
-        try dualPivotQSorter(lo: index(after: pivots.lPivot), hi: beforeRP, by: areInIncreasingOrder)
-        try dualPivotQSorter(lo: index(after: pivots.rPivot), hi: hi, by: areInIncreasingOrder)
+        let pivots = try dualPivotPartition(range, by: areInIncreasingOrder)
+        try dualPivotQSorter(range.lowerBound..<pivots.lPivot, by: areInIncreasingOrder)
+        try dualPivotQSorter(index(after: pivots.lPivot)..<pivots.rPivot, by: areInIncreasingOrder)
+        try dualPivotQSorter(index(after: pivots.rPivot)..<range.upperBound, by: areInIncreasingOrder)
     }
     
-    mutating func dualPivotPartition(lo: Index, hi: Index, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> (lPivot: Index, rPivot: Index) {
-        if try areInIncreasingOrder(self[hi], self[lo]) {
-            swapAt(lo, hi)
+    mutating func dualPivotPartition(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> (lPivot: Index, rPivot: Index) {
+        let hi = index(before: range.upperBound)
+        if try areInIncreasingOrder(self[hi], self[range.lowerBound]) {
+            swapAt(range.lowerBound, hi)
         }
-        var l = index(after: lo)
-        let beforeHiOffset = distance(from: startIndex, to: hi) - 1
-        var r = index(startIndex, offsetBy: beforeHiOffset)
+        var l = index(after: range.lowerBound)
+        var r = index(before: hi)
         var k = l
-        let p = self[lo]
+        let p = self[range.lowerBound]
         let q = self[hi]
         
         while k <= r {
@@ -291,12 +254,10 @@ extension MutableCollection {
                 formIndex(after: &l)
             } else if try areInIncreasingOrder(self[k], q) == false {
                 while try areInIncreasingOrder(q, self[r]) && k < r {
-                    let beforeROffset = distance(from: startIndex, to: r) - 1
-                    r = index(startIndex, offsetBy: beforeROffset)
+                    formIndex(before: &r)
                 }
                 swapAt(k, r)
-                let beforeROffset = distance(from: startIndex, to: r) - 1
-                r = index(startIndex, offsetBy: beforeROffset)
+                formIndex(before: &r)
                 if try areInIncreasingOrder(self[k], p) {
                     swapAt(k, l)
                     formIndex(after: &l)
@@ -304,10 +265,9 @@ extension MutableCollection {
             }
             formIndex(after: &k)
         }
-        let beforeLOffset = distance(from: startIndex, to: l) - 1
-        l = index(startIndex, offsetBy: beforeLOffset)
+        formIndex(before: &l)
         formIndex(after: &r)
-        swapAt(lo, l)
+        swapAt(range.lowerBound, l)
         swapAt(hi, r)
         
         return (l, r)
@@ -315,181 +275,56 @@ extension MutableCollection {
     
 }
 
-// MARK: - QuickSort on UnsafeMutableBufferPointer
-extension UnsafeMutableBufferPointer {
-    // DutchFlag
-    mutating func dutchFlagQSorter(lo: Int, hi: Int, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        guard lo < hi  else { return }
-        
-        let lenght = hi - lo + 1
-        guard lenght > 10 else {
-            try insertionSortWithBinarySearchOn(lo..<(hi + 1), by: areInIncreasingOrder)
-            
-            return
-        }
-        let p = try pivot(within: lo..<(hi + 1), by: areInIncreasingOrder)
-        swapAt(lo, p)
- 
-        var lt = lo
-        var gt = hi
-        var i = lo
-        let v = self[lo]
-        while i <= gt {
-            if try areInIncreasingOrder(self[i], v) {
-                swapAt(lt, i)
-                lt += 1
-                i += 1
-            } else if try areInIncreasingOrder(v, self[i]) {
-                swapAt(i, gt)
-                gt -= 1
-            } else {
-                i += 1
-            }
-        }
-        try dutchFlagQSorter(lo: lo, hi: (lt - 1), by: areInIncreasingOrder)
-        try dutchFlagQSorter(lo: (gt + 1), hi: hi, by: areInIncreasingOrder)
-    }
-    
-    // Hoare
-    mutating func hoareQSorter(lo: Int, hi: Int, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        guard lo < hi else { return }
-        
-        let lenght = hi - lo + 1
-        guard lenght > 10 else {
-            try insertionSortWithBinarySearchOn(lo..<(hi + 1), by: areInIncreasingOrder)
-            
-            return
-        }
-        
-        let p = try pivot(within: lo..<(hi + 1), by: areInIncreasingOrder)
-        swapAt(lo, p)
-        let pivot = try hoarePartition(lo: lo, hi: hi, by: areInIncreasingOrder)
-        try hoareQSorter(lo: lo, hi: (pivot - 1), by: areInIncreasingOrder)
-        try hoareQSorter(lo: pivot + 1, hi: hi, by: areInIncreasingOrder)
-    }
-    
-    mutating func hoarePartition(lo: Int, hi: Int, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
-        let pivot = self[lo]
-        var i = lo
-        var j = hi + 1
-        while true {
-            repeat {
-                if i == hi { break }
-                i += 1
-            } while try areInIncreasingOrder(self[i], pivot)
-            
-            repeat {
-                if j == lo { break }
-                j -= 1
-            } while try areInIncreasingOrder(pivot, self[j])
-            if i >= j { break }
-            swapAt(i, j)
-        }
-        swapAt(lo, j)
-        
-        return j
-    }
-    
-    // Lomutu
-    mutating func lomutuQSorter(lo: Int, hi: Int, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        guard lo < hi else { return }
-        
-        let lenght = hi - lo + 1
-        guard lenght > 10 else {
-            try insertionSortWithBinarySearchOn(lo..<(hi + 1), by: areInIncreasingOrder)
-            
-            return
-        }
-        
-        var p = try pivot(within: lo..<(hi + 1), by: areInIncreasingOrder)
-        swapAt(hi, p)
-        p = try lomutuPartition(lo: lo, hi: hi, by: areInIncreasingOrder)
-        try lomutuQSorter(lo: lo, hi: (p - 1), by: areInIncreasingOrder)
-        try lomutuQSorter(lo: (p + 1), hi: hi, by: areInIncreasingOrder)
-    }
-    
-    mutating func lomutuPartition(lo: Int, hi: Int, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
-        let pivot = self[hi]
-        var i = lo
-        var j = lo
-        while j < hi {
-            if try areInIncreasingOrder(pivot, self[j]) == false {
-                swapAt(i, j)
-                i += 1
-            }
-            j += 1
-        }
-        swapAt(i, hi)
-        
-        return i
-    }
-    
-    // DualPivot
-    mutating func dualPivotQSorter(lo: Int, hi: Int, by  areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        guard lo < hi else { return }
-        
-        let lenght = hi - lo
-        guard
-            lenght > 46
-        else {
-            try insertionSortWithBinarySearchOn(lo..<(hi + 1), by: areInIncreasingOrder)
-            
-            return
-        }
-        let offset = lenght / 3
-        var mid1 = lo + offset
-        var mid2 = hi - offset
-        let mid = lo + (lenght / 2)
-        if lenght <= 150 {
-            mid1 = try medianOf(lo: lo, hi: mid, by: areInIncreasingOrder)
-            mid2 = try medianOf(lo: index(after: mid), hi: hi, by: areInIncreasingOrder)
+// MARK: - QuickSort pivot utilties
+extension MutableCollection where Self: RandomAccessCollection {
+    @inline(__always)
+    mutating func pivot(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
+        var pivot: Index!
+        let lenght = distance(from: range.lowerBound, to: range.upperBound)
+        if lenght <= 25 {
+            pivot = index(range.lowerBound, offsetBy: lenght / 2)
+        } else if lenght <= 50 {
+            pivot = try medianOf(range, by: areInIncreasingOrder)
         } else {
-            mid1 = try ninther(lo: lo, hi: mid, by: areInIncreasingOrder)
-            mid2 = try ninther(lo: index(after: mid), hi: hi, by: areInIncreasingOrder)
+            pivot = try ninther(range, by: areInIncreasingOrder)
         }
-        swapAt(lo, mid1)
-        swapAt(hi, mid2)
         
-        let pivots = try dualPivotPartition(lo: lo, hi: hi, by: areInIncreasingOrder)
-        
-        try dualPivotQSorter(lo: lo, hi: (pivots.lPivot - 1), by: areInIncreasingOrder)
-        try dualPivotQSorter(lo: (pivots.lPivot + 1), hi: (pivots.rPivot - 1), by: areInIncreasingOrder)
-        try dualPivotQSorter(lo: (pivots.rPivot + 1), hi: hi, by: areInIncreasingOrder)
+        return pivot
     }
     
-    mutating func dualPivotPartition(lo: Int, hi: Int, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> (lPivot: Index, rPivot: Index) {
+    @inline(__always)
+    mutating func medianOf(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
+        let midOffset = distance(from: range.lowerBound, to: range.upperBound) / 2
+        let mid = index(range.lowerBound, offsetBy: midOffset)
+        
+        return try medianOfThree(lo: range.lowerBound, mid: mid, hi: index(before: range.upperBound), by: areInIncreasingOrder)
+    }
+    
+    @inlinable
+    mutating func medianOfThree(lo: Index, mid: Index, hi: Index, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
+        if try areInIncreasingOrder(self[mid], self[lo]) {
+            swapAt(lo, mid)
+        }
         if try areInIncreasingOrder(self[hi], self[lo]) {
-            swapAt(lo, hi)
+            swapAt(hi, lo)
         }
-        var l = lo + 1
-        var r = hi - 1
-        var k = l
-        let p = self[lo]
-        let q = self[hi]
-        
-        while k <= r {
-            if try areInIncreasingOrder(self[k], p) {
-                swapAt(k, l)
-                l += 1
-            } else if try areInIncreasingOrder(self[k], q) == false {
-                while try areInIncreasingOrder(q, self[r]) && k < r {
-                    r -= 1
-                }
-                swapAt(k, r)
-                r -= 1
-                if try areInIncreasingOrder(self[k], p) {
-                    swapAt(k, l)
-                    l += 1
-                }
-            }
-            k += 1
+        if try areInIncreasingOrder(self[hi], self[mid]) {
+            swapAt(hi, mid)
         }
-        l -= 1
-        r += 1
-        swapAt(lo, l)
-        swapAt(hi, r)
         
-        return (l, r)
+        return mid
+    }
+    
+    @usableFromInline
+    mutating func ninther(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
+        let lenght = distance(from: range.lowerBound, to: range.upperBound)
+        var gap = lenght / 9
+        if (lenght + gap) % 9 < gap { gap += 1 }
+        let loM = try medianOfThree(lo: range.lowerBound, mid: index(range.lowerBound, offsetBy: gap), hi: index(range.lowerBound, offsetBy: 2 * gap), by: areInIncreasingOrder)
+        let midM = try medianOfThree(lo: index(range.lowerBound, offsetBy: 3 * gap), mid: index(range.lowerBound, offsetBy: 4 * gap), hi: index(range.lowerBound, offsetBy: 5 * gap), by: areInIncreasingOrder)
+        let hiM = try medianOfThree(lo: index(range.lowerBound, offsetBy: 6 * gap), mid: index(range.lowerBound, offsetBy: 7 * gap), hi: index(range.lowerBound, offsetBy: 8 * gap), by: areInIncreasingOrder)
+        
+        return try medianOfThree(lo: loM, mid: midM, hi: hiM, by: areInIncreasingOrder)
     }
     
 }

@@ -45,7 +45,7 @@ let alwaysThrowingPredicate: (Int, Int) throws -> Bool = { _, _ in throw err }
 // MARK: - 
 // A MutableCollection NOT implementing
 // withContiguousMutableStorageIfAvailble(_:) method
-struct Coll<Element>: MutableCollection {
+struct Coll<Element>: MutableCollection, RandomAccessCollection {
     var elements: [Element]
     
     var count: Int { elements.count }
@@ -57,6 +57,28 @@ struct Coll<Element>: MutableCollection {
     var endIndex: Int { count }
     
     func index(after i: Int) -> Int { i + 1 }
+    
+    func index(before i: Int) -> Int { i - 1 }
+    
+    func formIndex(after i: inout Int) {
+        i += 1
+    }
+    
+    func formIndex(before i: inout Int) {
+        i -= 1
+    }
+    
+    func distance(from start: Int, to end: Int) -> Int {
+        elements.distance(from: start, to: end)
+    }
+    
+    func index(_ i: Int, offsetBy distance: Int) -> Int {
+        elements.index(i, offsetBy: distance)
+    }
+    
+    func index(_ i: Int, offsetBy distance: Int, limitedBy limit: Int) -> Int? {
+        elements.index(i, offsetBy: distance, limitedBy: limit)
+    }
     
     subscript(position: Int) -> Element {
         get {

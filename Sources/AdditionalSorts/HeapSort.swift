@@ -26,7 +26,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 //  OTHER DEALINGS IN THE SOFTWARE.
 
-extension MutableCollection {
+extension MutableCollection where Self: RandomAccessCollection {
     public mutating func heapSort(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
         guard !isEmpty else { return }
         
@@ -53,3 +53,74 @@ extension MutableCollection {
     
 }
 
+// MARK: - HeapSort utilities
+extension MutableCollection where Self: RandomAccessCollection {
+    @usableFromInline
+    mutating func heapRemove(heapEndIndex: Index, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows -> Index {
+        let last = index(before: heapEndIndex)
+        swapAt(startIndex, last)
+        try siftDown(from: startIndex, heapEndIndex: last, by: areInIncreasingOrder)
+        
+        return last
+    }
+    
+    @usableFromInline
+    mutating func buildMaxHeap(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
+        guard !isEmpty else { return }
+        
+        for i in stride(from: count / 2 - 1, through: 0, by: -1) {
+            let node = index(startIndex, offsetBy: i)
+            try siftDown(from: node, heapEndIndex: endIndex, by: areInIncreasingOrder)
+        }
+    }
+    
+    @usableFromInline
+    mutating func siftDown(from node: Index, heapEndIndex: Index, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows{
+        var parent = node
+        while true {
+            let left = leftChild(of: parent)
+            let right = rightChild(of: parent)
+            var candidate = parent
+            if left < heapEndIndex {
+                if try areInIncreasingOrder(self[candidate], self[left]) {
+                    candidate = left
+                }
+            }
+            if right < heapEndIndex {
+                if try areInIncreasingOrder(self[candidate], self[right]) {
+                    candidate = right
+                }
+            }
+            if candidate == parent {
+                return
+            }
+            swapAt(parent, candidate)
+            parent = candidate
+        }
+    }
+    
+    @usableFromInline
+    func parent(of node: Index) -> Index {
+        let nodeOffest = distance(from: startIndex, to: node)
+        let parentOffset = (nodeOffest - 1) / 2
+        
+        return index(startIndex, offsetBy: parentOffset)
+    }
+    
+    @usableFromInline
+    func leftChild(of node: Index) -> Index {
+        let nodeOffset = distance(from: startIndex, to: node)
+        let leftChildOffset = (nodeOffset * 2) + 1
+        
+        return index(startIndex, offsetBy: leftChildOffset)
+    }
+    
+    @usableFromInline
+    func rightChild(of node: Index) -> Index {
+        let nodeOffset = distance(from: startIndex, to: node)
+        let rightChildOffset = (nodeOffset * 2) + 2
+        
+        return index(startIndex, offsetBy: rightChildOffset)
+    }
+    
+}

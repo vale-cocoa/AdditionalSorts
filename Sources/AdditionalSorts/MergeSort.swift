@@ -26,7 +26,7 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 //  OTHER DEALINGS IN THE SOFTWARE.
 
-extension MutableCollection {
+extension MutableCollection where Self: RandomAccessCollection {
     public mutating func recursiveMergeSort(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
         guard !isEmpty else { return }
         
@@ -37,13 +37,13 @@ extension MutableCollection {
                 buffCount > 0
             else { return true }
             
-            try buffer.recursiveMergeSortOn(0..<buffCount, by: areInIncreasingOrder)
+            try buffer.recursiveMergeSorter(0..<buffCount, by: areInIncreasingOrder)
             
             return true
         } ?? false
         
         guard done else {
-            try recursiveMergeSortOn(startIndex..<endIndex, by: areInIncreasingOrder)
+            try recursiveMergeSorter(startIndex..<endIndex, by: areInIncreasingOrder)
             
             return
         }
@@ -65,22 +65,23 @@ extension MutableCollection {
         }
     }
     
-    mutating func recursiveMergeSortOn(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        let hiOffset = distance(from: range.lowerBound, to: range.upperBound) - 1
-        let hi = index(range.lowerBound, offsetBy: hiOffset)
+    mutating func recursiveMergeSorter(_ range: Range<Index>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
+        //let hiOffset = distance(from: range.lowerBound, to: range.upperBound) - 1
+        //let hi = index(range.lowerBound, offsetBy: hiOffset)
+        let hi = index(before: range.upperBound)
         guard range.lowerBound < hi else { return }
         
         let midOffset = distance(from: range.lowerBound, to: hi) / 2
         guard midOffset > 10 else {
-            try insertionSortOn(range, by: areInIncreasingOrder)
+            try insertionSorter(range, by: areInIncreasingOrder)
             
             return
         }
         
         let mid = index(range.lowerBound, offsetBy: midOffset)
         let afterMid = index(after: mid)
-        try recursiveMergeSortOn(range.lowerBound..<afterMid, by: areInIncreasingOrder)
-        try recursiveMergeSortOn(afterMid..<range.upperBound, by: areInIncreasingOrder)
+        try recursiveMergeSorter(range.lowerBound..<afterMid, by: areInIncreasingOrder)
+        try recursiveMergeSorter(afterMid..<range.upperBound, by: areInIncreasingOrder)
         guard
             try areInIncreasingOrder(self[afterMid], self[mid])
         else { return }
@@ -90,20 +91,19 @@ extension MutableCollection {
     
     @usableFromInline
     mutating func iterativeMergeSorter(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        let lenght = count
-        guard lenght > 20 else {
-            try insertionSortOn(startIndex..<endIndex, by: areInIncreasingOrder)
+        guard count > 20 else {
+            try insertionSorter(startIndex..<endIndex, by: areInIncreasingOrder)
             
             return
         }
         
         var size = 1
-        while size < lenght {
+        while size < count {
             var lowerBoundOffset = 0
-            while lowerBoundOffset < lenght - size {
+            while lowerBoundOffset < count - size {
                 let lowerBound = index(startIndex, offsetBy: lowerBoundOffset)
                 let mid = index(lowerBound, offsetBy: size - 1)
-                let upperBoundOffset = Swift.min(lowerBoundOffset + 2 * size - 1, lenght - 1) + 1
+                let upperBoundOffset = Swift.min(lowerBoundOffset + 2 * size - 1, count - 1) + 1
                 let upperBound = index(startIndex, offsetBy: upperBoundOffset)
                 try mergeOn(lowerBound..<upperBound, mid: mid, by: areInIncreasingOrder)
                 
@@ -115,49 +115,32 @@ extension MutableCollection {
     
 }
 
-// MARK: - MergeSort on UnsafeMutableBufferPointer
-extension UnsafeMutableBufferPointer {
-    mutating func recursiveMergeSortOn(_ range: Range<Int>, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        let hi = range.upperBound - 1
-        guard range.lowerBound < hi else { return }
-        
-        let midOffset = range.count / 2
-        guard midOffset > 10 else {
-            try insertionSortOn(range, by: areInIncreasingOrder)
-            
-            return
-        }
-        
-        let mid = range.lowerBound + midOffset
-        try recursiveMergeSortOn(range.lowerBound..<(mid + 1), by: areInIncreasingOrder)
-        try recursiveMergeSortOn((mid + 1)..<range.upperBound, by: areInIncreasingOrder)
-        
-        guard
-            try areInIncreasingOrder(self[mid + 1], self[mid])
-        else { return }
-        
-        try mergeOn(range, mid: mid, by: areInIncreasingOrder)
-    }
-    
+// MARK: - MergeSort utilities
+extension MutableCollection where Self: RandomAccessCollection {
     @usableFromInline
-    mutating func iterativeMergeSorter(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        let lenght = count
-        guard lenght > 20 else {
-            try insertionSortOn(startIndex..<endIndex, by: areInIncreasingOrder)
-            
-            return
-        }
-        
-        var size = 1
-        while size < lenght {
-            var lowerBound = 0
-            while lowerBound < lenght - size {
-                let mid = lowerBound + size - 1
-                let upperBound = Swift.min(lowerBound + 2 * size - 1, lenght - 1) + 1
-                try mergeOn(lowerBound..<upperBound, mid: mid, by: areInIncreasingOrder)
-                lowerBound += 2 * size
+    mutating func mergeOn(_ range: Range<Index>, mid: Index, by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
+        let slice = Array(self[range])
+        let midDistance = distance(from: range.lowerBound, to: mid)
+        let hi = index(before: range.upperBound)
+        let hiDistance = distance(from: range.lowerBound, to: hi)
+        var k = range.lowerBound
+        var i = 0
+        var j = midDistance + 1
+        while k <= hi {
+            if i > midDistance {
+                self[k] = slice[j]
+                j += 1
+            } else if j > hiDistance {
+                self[k] = slice[i]
+                i += 1
+            } else if try areInIncreasingOrder(slice[j], slice[i]) {
+                self[k] = slice[j]
+                j += 1
+            } else {
+                self[k] = slice[i]
+                i += 1
             }
-            size *= 2
+            formIndex(after: &k)
         }
     }
     

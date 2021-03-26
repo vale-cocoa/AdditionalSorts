@@ -26,29 +26,28 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 //  OTHER DEALINGS IN THE SOFTWARE.
 
-extension MutableCollection {
+extension MutableCollection where Self: RandomAccessCollection {
     public mutating func shellSort(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
         guard !isEmpty else { return }
         
         let done: Bool = try withContiguousMutableStorageIfAvailable { buffer in
-            try buffer._shellSort(by: areInIncreasingOrder)
+            try buffer._shellSorter(by: areInIncreasingOrder)
             
             return true
         } ?? false
         
         guard done else {
-            try _shellSort(by: areInIncreasingOrder)
+            try _shellSorter(by: areInIncreasingOrder)
             
             return
         }
     }
     
     @inline(__always)
-    mutating func _shellSort(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        let lenght = count
-        var h = _hLenght(lenght)
+    mutating func _shellSorter(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
+        var h = _hLenght(count)
         while h >= 1 {
-            INNER: for i in h..<lenght {
+            INNER: for i in h..<count {
                 var j = i
                 var jIdx = index(startIndex, offsetBy: j)
                 var hOffset = distance(from: startIndex, to: jIdx) - h
@@ -65,7 +64,7 @@ extension MutableCollection {
                     
                     jIdx = index(startIndex, offsetBy: j)
                     hOffset = distance(from: startIndex, to: jIdx) - h
-                    guard hOffset >= 0 else { break INNERMOST }
+                    
                     hIdx = index(startIndex, offsetBy: hOffset)
                 }
             }
@@ -74,32 +73,7 @@ extension MutableCollection {
     }
     
 }
-
-// MARK: - ShellSort on UnsafeMutableBufferPointer
-extension UnsafeMutableBufferPointer {
-    @inline(__always)
-    mutating func _shellSort(by areInIncreasingOrder: (Element, Element) throws -> Bool) rethrows {
-        let lenght = count
-        var h = _hLenght(lenght)
-        while h >= 1 {
-            for i in h..<lenght {
-                var j = i
-                var hIdx = j - h
-                while
-                    j >= h,
-                    try areInIncreasingOrder(self[j], self[hIdx])
-                {
-                    swapAt(j, hIdx)
-                    j -= h
-                    hIdx = j - h
-                }
-            }
-            h /= 3
-        }
-    }
-    
-}
-
+ 
 // MARK: - Private helper
 @inline(__always)
 fileprivate func _hLenght(_ lenght: Int) -> Int {
